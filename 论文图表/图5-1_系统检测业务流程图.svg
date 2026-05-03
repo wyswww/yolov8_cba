@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="162" viewBox="0 0 1400 162">
-<rect width="100%" height="100%" fill="#f8fbff"/>
-<text x="700" y="58" text-anchor="middle" font-family="Microsoft YaHei, SimHei" font-size="34" font-weight="700" fill="#1d3557">系统检测业务流程图</text>
-<text x="70" y="118" font-family="Microsoft YaHei, SimHei" font-size="25" fill="#23364d">输入选择 -&gt; 图像帧读取 -&gt; YOLO模型推理 -&gt; 结果解析 -&gt; 界面展示/专注度计算 -&gt; 结果保存</text>
-</svg>
