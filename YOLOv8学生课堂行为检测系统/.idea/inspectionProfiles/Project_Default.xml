@@ -1,0 +1,26 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="torch" />
+          <option value="torchvision" />
+          <option value="onnx" />
+          <option value="onnxruntime" />
+          <option value="pycocotools" />
+          <option value="PyYAML" />
+          <option value="scipy" />
+          <option value="onnxsim" />
+          <option value="onnxruntime-gpu" />
+          <option value="gradio" />
+          <option value="opencv-python" />
+          <option value="psutil" />
+          <option value="py-cpuinfo" />
+          <option value="huggingface-hub" />
+          <option value="safetensors" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
