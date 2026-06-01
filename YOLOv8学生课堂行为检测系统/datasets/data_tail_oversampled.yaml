@@ -1,0 +1,14 @@
+# Train split with long-tail oversampling. Val/test are unchanged.
+path: C:/Users/19554/Desktop/git毕设/demo/YOLOv8学生课堂行为检测系统/datasets/classroom_tail_oversampled
+train: images/train
+val: images/val
+test: images/test
+
+nc: 6
+names:
+  - hand-raising
+  - reading
+  - writing
+  - using phone
+  - bowing the head
+  - leaning over the table

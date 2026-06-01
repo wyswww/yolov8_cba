@@ -79,6 +79,14 @@ from .transformer import (
     TransformerEncoderLayer,
     TransformerLayer,
 )
+from .attention import (  # 新增注意力机制模块
+    SimAM,
+    ECA,
+    CoordAtt,
+    C3CBAM,
+    C3ECA,
+    EMA,
+)
 
 __all__ = (
     "Conv",
@@ -143,5 +151,12 @@ __all__ = (
     "C2fCIB",
     "SCDown",
     "RepVGGDW",
-    "v10Detect"
+    "v10Detect",
+    # 新增注意力机制
+    "SimAM",
+    "ECA",
+    "CoordAtt",
+    "C3CBAM",
+    "C3ECA",
+    "EMA",
 )

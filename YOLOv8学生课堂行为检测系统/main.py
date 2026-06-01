@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
-
+#2026.4.23更新
 torch.set_default_tensor_type('torch.FloatTensor')
 import torch.serialization
 
@@ -36,6 +36,7 @@ from UIProgram.QssLoader import QSSLoader
 from UIProgram.precess_bar import ProgressBar
 import detect_tools as tools
 import Config
+from roi_inference import ROIPredictor
 
 # ====================== 【极简美化】不影响任何功能 ======================
 LIGHT_STYLE = """
@@ -311,7 +312,18 @@ class DetectionApp(QMainWindow):
         self.setStyleSheet(qss)
 
     def _init_detection_resources(self):
-        self.detector = YOLO('runs/detect/exp20/weights/best.pt', task='detect')
+        model = YOLO(Config.model_path, task='detect')
+        if getattr(Config, "roi_crop_enabled", False):
+            roi = getattr(Config, "roi_crop", {})
+            self.detector = ROIPredictor(
+                model,
+                left=roi.get("left", 0.0),
+                top=roi.get("top", 0.06),
+                right=roi.get("right", 1.0),
+                bottom=roi.get("bottom", 1.0),
+            )
+        else:
+            self.detector = model
         self.detector(np.zeros((48, 48, 3)))
         self.detection_font = ImageFont.truetype("Font/platech.ttf", 25, 0)
         self.color_palette = tools.Colors()

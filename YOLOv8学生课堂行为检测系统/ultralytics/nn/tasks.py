@@ -53,7 +53,18 @@ from ultralytics.nn.modules import (
     PSA,
     SCDown,
     RepVGGDW,
-    v10Detect
+    v10Detect,
+    CBAM,  # 注意力机制导入
+    ChannelAttention,
+    SpatialAttention,
+)
+from ultralytics.nn.modules.attention import (  # 自定义注意力机制
+    SimAM,
+    ECA,
+    CoordAtt,
+    C3CBAM,
+    C3ECA,
+    EMA,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -884,19 +895,61 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             RepC3,
             PSA,
             SCDown,
-            C2fCIB
+            C2fCIB,
+            # 注意力机制模块
+            CBAM,
+            ChannelAttention,
+            SpatialAttention,
+            SimAM,
+            ECA,
+            CoordAtt,
+            C3CBAM,
+            C3ECA,
+            EMA,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
+
+            # 注意力机制模块参数特殊处理
+            if m is CBAM:
+                # CBAM(c1) — 只用通道数，kernel_size默认7
+                args = [c2]
+                c2 = c2
+            elif m is ECA:
+                # ECA(channels) — 只用通道数生成自适应卷积核
+                args = [c2]
+            elif m is CoordAtt:
+                # CoordAtt(inp, oup) — 需要输入和输出通道数相同
+                args = [c1, c2]
+            elif m is SimAM:
+                # SimAM(e_lambda) — 无参数注意力，用原始参数或默认值
+                e_lambda = args[0] if args else 1e-4
+                args = [e_lambda]
+                c2 = ch[f]  # SimAM不改变通道数
+            elif m is EMA:
+                # EMA(channels, num_groups) — 只需要通道数
+                args = [c2, *args[1:]]
+            elif m is ChannelAttention:
+                # ChannelAttention(channels)
+                args = [c2]
+            elif m is SpatialAttention:
+                # SpatialAttention(kernel_size)
+                args = [c2] if args else [7]
+                c2 = ch[f]  # 不改变通道数
+            elif m in {C3CBAM, C3ECA}:
+                # C3CBAM/C3ECA(c1, c2, n, shortcut, g, e)
+                args = [c1, c2, *args[1:]]
+            else:
+                args = [c1, c2, *args[1:]]
+
             if m is C2fAttn:
                 args[1] = make_divisible(min(args[1], max_channels // 2) * width, 8)  # embed channels
                 args[2] = int(
                     max(round(min(args[2], max_channels // 2 // 32)) * width, 1) if args[2] > 1 else args[2]
                 )  # num heads
 
-            args = [c1, c2, *args[1:]]
-            if m in (BottleneckCSP, C1, C2, C2f, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3, C2fCIB):
+            if m in (BottleneckCSP, C1, C2, C2f, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3, C2fCIB, C3CBAM, C3ECA):
                 args.insert(2, n)  # number of repeats
                 n = 1
         elif m is AIFI:

@@ -1,9 +1,14 @@
-train: E:\课堂行为检测\学生课堂行为检测数据集\images\train
-val: E:\课堂行为检测\学生课堂行为检测数据集\images\val
-test: E:\课堂行为检测\学生课堂行为检测数据集\images\test
-
+# Dataset config for classroom behavior detection.
+path: ..
+train: datasets/学生课堂行为检测数据集/images/train
+val: datasets/学生课堂行为检测数据集/images/val
+test: datasets/学生课堂行为检测数据集/images/test
 
 nc: 6
-
-# class names
-names:  [ 'hand-raising', 'reading', 'writing','using phone', 'bowing the head', 'leaning over the table']
+names:
+  - hand-raising
+  - reading
+  - writing
+  - using phone
+  - bowing the head
+  - leaning over the table

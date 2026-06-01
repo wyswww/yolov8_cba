@@ -1,0 +1,14 @@
+# ROI-cropped dataset config for classroom behavior detection.
+path: C:/Users/19554/Desktop/git毕设/demo/YOLOv8学生课堂行为检测系统/datasets/classroom_roi_crop
+train: images/train
+val: images/val
+test: images/test
+
+nc: 6
+names:
+  - hand-raising
+  - reading
+  - writing
+  - using phone
+  - bowing the head
+  - leaning over the table
