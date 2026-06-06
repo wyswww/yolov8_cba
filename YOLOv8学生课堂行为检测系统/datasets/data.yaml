@@ -2,7 +2,7 @@
 path: ..
 train: datasets/学生课堂行为检测数据集/images/train
 val: datasets/学生课堂行为检测数据集/images/val
-test: datasets/学生课堂行为检测数据集/images/test
+test: E:\课堂行为检测\学生课堂行为检测数据集\images\test
 
 nc: 6
 names:

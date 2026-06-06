@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Validate trained YOLO models on the test split and print a comparison table."""
+"""Validate six trained YOLO models on the test split and print a comparison table."""
 
 import os
 import warnings
@@ -15,20 +15,19 @@ torch.load = lambda *args, **kwargs: _original_load(*args, **kwargs, weights_onl
 from ultralytics import YOLO
 
 
-MODELS = {
-    "baseline_mAP_100epochs": "runs/detect/baseline_mAP_100epochs/weights/best.pt",
+MODELS = [
+    {"name": "1_baseline_mAP_100epochs",          "path": "runs/detect/baseline_mAP_100epochs/weights/best.pt",              "imgsz": 640},
+    {"name": "2_optimized_attention",              "path": "runs/detect/optimized_attention_light_m_pretrained/weights/best.pt", "imgsz": 640},
+    {"name": "3_yolov8m_p2",                       "path": "runs/detect/yolov8m_p2_100epochs/weights/best.pt",                 "imgsz": 640},
+    {"name": "4_baseline_finetune_img800_weakaug", "path": "runs/detect/baseline_finetune_img800_weakaug/weights/best.pt",    "imgsz": 800},
+    {"name": "5_coordatt_backbone_eca_neck",       "path": "runs/detect/coordatt_backbone_eca_neck_m_pretrained/weights/best.pt", "imgsz": 640},
+    {"name": "6_strong_img800_tail_weakaug",       "path": "runs/detect/strong_img800_tail_weakaug/weights/best.pt",          "imgsz": 800},
+    {"name": "7_exp", "path": "runs/detect/exp/weights/best.pt",  "imgsz": 640},
+]
 
-    "optimized_attention_light_m_pretrained": "runs/detect/optimized_attention_light_m_pretrained/weights/best.pt",
-    "yolov8m_p2_100epochs": "runs/detect/yolov8m_p2_100epochs/weights/best.pt",
-    "baseline_finetune_img800_weakaug": "runs/detect/baseline_finetune_img800_weakaug/weights/best.pt",
-    "baseline_finetune_img800_weakaug2": "runs/detect/baseline_finetune_img800_weakaug2/weights/best.pt",
-    "yolov8m_img800_weakaug_120epochs": "runs/detect/yolov8m_img800_weakaug_120epochs/weights/best.pt",
-}
-
-TEST_CONFIG = {
+BASE_TEST_CONFIG = {
     "data": "datasets/data.yaml",
     "split": "test",
-    "imgsz": 640,
     "batch": 8,
     "workers": 0,
     "conf": 0.001,
@@ -40,7 +39,7 @@ TEST_CONFIG = {
 }
 
 
-def test_model(model_name, model_path):
+def test_model(model_name, model_path, imgsz):
     print("\n" + "=" * 60)
 
     if not os.path.exists(model_path):
@@ -49,10 +48,12 @@ def test_model(model_name, model_path):
 
     print(f"Testing: {model_name}")
     print(f"Model path: {model_path}")
+    print(f"imgsz: {imgsz}")
 
     try:
         model = YOLO(model_path)
-        config = TEST_CONFIG.copy()
+        config = BASE_TEST_CONFIG.copy()
+        config["imgsz"] = imgsz
         config["name"] = f"test_{model_name}"
         metrics = model.val(**config)
 
@@ -71,9 +72,9 @@ def test_model(model_name, model_path):
             "leaning over the table",
         ]
         print("\nPer-class mAP@0.5:")
-        for i, (name, ap) in enumerate(zip(class_names, metrics.box.ap50), start=1):
+        for i, (cls_name, ap) in enumerate(zip(class_names, metrics.box.ap50), start=1):
             bar = "#" * int(ap * 20)
-            print(f"  {i}. {name:<24} {ap:.4f} {bar}")
+            print(f"  {i}. {cls_name:<24} {ap:.4f} {bar}")
 
         return {
             "precision": metrics.box.mp,
@@ -88,48 +89,50 @@ def test_model(model_name, model_path):
 
 def compare_results(results):
     valid_results = {name: res for name, res in results.items() if res}
-    if len(valid_results) < 2:
+    if not valid_results:
+        print("\nNo valid results to compare.")
         return
 
-    print("\n" + "=" * 60)
-    print("Model comparison")
-    print("=" * 60)
-    print(f"{'Model':<42} {'mAP@0.5':<10} {'mAP@0.5:0.95':<14} {'Prec':<10} {'Rec':<10}")
-    print("-" * 90)
+    print("\n" + "=" * 86)
+    print("六种模型 - 测试集指标对比")
+    print("=" * 86)
+    print(f"{'模型':<44} {'Prec':<10} {'Rec':<10} {'mAP@0.5':<10} {'mAP@0.5:0.95':<14}")
+    print("-" * 88)
 
-    baseline_map50 = None
+    baseline_res = None
     for name, res in valid_results.items():
         print(
-            f"{name:<42} {res['map50']:<10.4f} {res['map50_95']:<14.4f} "
-            f"{res['precision']:<10.4f} {res['recall']:<10.4f}"
+            f"{name:<44} {res['precision']:<10.4f} {res['recall']:<10.4f} "
+            f"{res['map50']:<10.4f} {res['map50_95']:<14.4f}"
         )
-        if name == "baseline_mAP_100epochs":
-            baseline_map50 = res["map50"]
+        if "baseline_mAP_100epochs" in name:
+            baseline_res = res
 
-    if baseline_map50 is None:
+    if baseline_res is None:
         return
 
-    print("\nCompared with baseline mAP@0.5:")
+    print("\n相较基线 mAP@0.5 变化:")
     for name, res in valid_results.items():
-        if name == "baseline_mAP_100epochs":
+        if "baseline_mAP_100epochs" in name:
             continue
-        improvement = res["map50"] - baseline_map50
-        percent = improvement / baseline_map50 * 100
+        improvement = res["map50"] - baseline_res["map50"]
+        percent = improvement / baseline_res["map50"] * 100
         print(f"  {name}: {improvement:+.4f} ({percent:+.2f}%)")
 
 
 def main():
     print("=" * 60)
-    print("YOLOv8 model validation")
+    print("YOLOv8 六种模型验证 (测试集)")
     print("=" * 60)
 
     results = {}
-    for model_name, model_path in MODELS.items():
-        result = test_model(model_name, model_path)
+    for m in MODELS:
+        result = test_model(m["name"], m["path"], m["imgsz"])
         if result:
-            results[model_name] = result
+            results[m["name"]] = result
 
     compare_results(results)
+    print("\n测试完成！")
 
 
 if __name__ == "__main__":

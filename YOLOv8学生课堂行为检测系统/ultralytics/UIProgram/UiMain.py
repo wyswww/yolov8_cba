@@ -194,11 +194,70 @@ class Ui_MainWindow(object):
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(self.right_widget)
         self.verticalLayout_4.setObjectName("verticalLayout_4")
 
-        # 图像显示区域
-        self.label_show = QtWidgets.QLabel(self.right_widget)
-        self.label_show.setAlignment(QtCore.Qt.AlignCenter)
-        self.label_show.setObjectName("label_show")
-        self.verticalLayout_4.addWidget(self.label_show)
+        # ==================== 可缩放图像显示区域 ====================
+        self.image_container = QtWidgets.QWidget(self.right_widget)
+        self.image_container.setObjectName("image_container")
+        self.image_layout = QtWidgets.QVBoxLayout(self.image_container)
+        self.image_layout.setContentsMargins(0, 0, 0, 0)
+        self.image_layout.setSpacing(2)
+
+        # 缩放工具栏
+        self.zoom_toolbar = QtWidgets.QWidget(self.image_container)
+        self.zoom_toolbar.setObjectName("zoom_toolbar")
+        self.zoom_toolbar.setMaximumHeight(32)
+        self.zoom_layout = QtWidgets.QHBoxLayout(self.zoom_toolbar)
+        self.zoom_layout.setContentsMargins(4, 0, 4, 0)
+        self.zoom_layout.setSpacing(4)
+
+        self.zoom_plus_btn = QtWidgets.QPushButton("＋")
+        self.zoom_plus_btn.setObjectName("zoom_plus_btn")
+        self.zoom_plus_btn.setFixedSize(28, 28)
+        self.zoom_plus_btn.setToolTip("放大 (Ctrl+滚轮)")
+
+        self.zoom_minus_btn = QtWidgets.QPushButton("－")
+        self.zoom_minus_btn.setObjectName("zoom_minus_btn")
+        self.zoom_minus_btn.setFixedSize(28, 28)
+        self.zoom_minus_btn.setToolTip("缩小 (Ctrl+滚轮)")
+
+        self.zoom_fit_btn = QtWidgets.QPushButton("⊡")
+        self.zoom_fit_btn.setObjectName("zoom_fit_btn")
+        self.zoom_fit_btn.setFixedSize(28, 28)
+        self.zoom_fit_btn.setToolTip("适应窗口")
+
+        self.zoom_label = QtWidgets.QLabel("100%")
+        self.zoom_label.setObjectName("zoom_label")
+        self.zoom_label.setFixedWidth(45)
+        self.zoom_label.setAlignment(QtCore.Qt.AlignCenter)
+
+        self.zoom_layout.addWidget(self.zoom_plus_btn)
+        self.zoom_layout.addWidget(self.zoom_minus_btn)
+        self.zoom_layout.addWidget(self.zoom_fit_btn)
+        self.zoom_layout.addWidget(self.zoom_label)
+        self.zoom_layout.addStretch()
+
+        self.image_layout.addWidget(self.zoom_toolbar)
+
+        # 可缩放图像视图
+        self.graphicsView = QtWidgets.QGraphicsView(self.image_container)
+        self.graphicsView.setObjectName("graphicsView")
+        self.graphicsView.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
+        self.graphicsView.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+        self.graphicsView.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self.graphicsView.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self.graphicsView.setViewportUpdateMode(QtWidgets.QGraphicsView.SmartViewportUpdate)
+        self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.graphicsView.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.graphicsView.setBackgroundBrush(QtGui.QBrush(QtGui.QColor("#f0f0f0")))
+        self._zoom_scene = QtWidgets.QGraphicsScene(self.graphicsView)
+        self.graphicsView.setScene(self._zoom_scene)
+
+        self.image_layout.addWidget(self.graphicsView)
+
+        self.verticalLayout_4.addWidget(self.image_container)
+
+        # 保留旧 name 兼容
+        self.label_show = self.graphicsView
 
         # 检测结果表格
         self.tableWidget = QtWidgets.QTableWidget(self.right_widget)
@@ -252,4 +311,5 @@ class Ui_MainWindow(object):
         self.ExitBtn.setText(_translate("MainWindow", "退出系统"))
 
         # 显示区域
-        self.label_show.setText(_translate("MainWindow", "图像显示区域"))
+        placeholder = self._zoom_scene.addText("图像显示区域")
+        placeholder.setDefaultTextColor(QtGui.QColor("#999999"))

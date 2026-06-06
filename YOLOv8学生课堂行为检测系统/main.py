@@ -59,6 +59,32 @@ QMainWindow {
     background-color: #f5f7fa;
 }
 
+/* ------------- 缩放工具栏按钮 ------------- */
+QPushButton#zoom_plus_btn, QPushButton#zoom_minus_btn, QPushButton#zoom_fit_btn {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #d0d5dd;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0px;
+}
+QPushButton#zoom_plus_btn:hover, QPushButton#zoom_minus_btn:hover, QPushButton#zoom_fit_btn:hover {
+    background-color: #e8ecf1;
+    border-color: #4a6cf7;
+}
+QLabel#zoom_label {
+    font-size: 12px;
+    color: #555555;
+}
+
+/* ------------- 图像容器 ------------- */
+QWidget#image_container {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
 /* ------------- 只放大专注度显示标签 ------------- */
 QLabel#label_nums {
     font-size: 16px;
@@ -285,6 +311,12 @@ class DetectionApp(QMainWindow):
         self.camera_active = False
         self.video_capture = None
 
+        # ---- 初始化图像视图缩放状态 ----
+        self._zoom_factor = 1.0
+        self._zoom_pixmap_item = None
+        gv = self.ui.graphicsView
+        gv.wheelEvent = self._zoom_wheel_event  # 劫持滚轮事件
+
         table = self.ui.tableWidget
         table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
         table.verticalHeader().setDefaultSectionSize(40)
@@ -305,6 +337,10 @@ class DetectionApp(QMainWindow):
         self.ui.SaveBtn.clicked.connect(self._save_results)
         self.ui.ExitBtn.clicked.connect(QCoreApplication.quit)
         self.ui.FilesBtn.clicked.connect(self._process_image_batch)
+        # 缩放按钮
+        self.ui.zoom_plus_btn.clicked.connect(self._zoom_in)
+        self.ui.zoom_minus_btn.clicked.connect(self._zoom_out)
+        self.ui.zoom_fit_btn.clicked.connect(self._zoom_fit)
 
     def _load_stylesheet(self):
         style_file = 'UIProgram/style.css'
@@ -332,6 +368,61 @@ class DetectionApp(QMainWindow):
         # 初始化视频流专注度追踪器
         self.focus_tracker = FocusTracker()
 
+    # ====================== 图像缩放功能 ======================
+    ZOOM_MIN = 0.1
+    ZOOM_MAX = 10.0
+    ZOOM_STEP = 1.25
+
+    def _set_display_cvimage(self, cv_img):
+        """将 OpenCV 图像设置到 QGraphicsView 中，初始自动适应窗口"""
+        qpix = tools.cvimg_to_qpiximg(cv_img)
+        scene = self.ui.graphicsView.scene()
+        scene.clear()
+        self._zoom_pixmap_item = scene.addPixmap(qpix)
+        scene.setSceneRect(qpix.rect())
+        self._zoom_fit()
+
+    def _zoom_wheel_event(self, event):
+        """鼠标滚轮缩放（以鼠标位置为中心）"""
+        factor = self.ZOOM_STEP
+        if event.angleDelta().y() < 0:
+            factor = 1.0 / factor
+        new_zoom = self._zoom_factor * factor
+        if self.ZOOM_MIN <= new_zoom <= self.ZOOM_MAX:
+            self.ui.graphicsView.scale(factor, factor)
+            self._zoom_factor = new_zoom
+            self._update_zoom_label()
+
+    def _zoom_in(self):
+        if self._zoom_factor >= self.ZOOM_MAX:
+            return
+        self.ui.graphicsView.scale(self.ZOOM_STEP, self.ZOOM_STEP)
+        self._zoom_factor *= self.ZOOM_STEP
+        self._update_zoom_label()
+
+    def _zoom_out(self):
+        if self._zoom_factor <= self.ZOOM_MIN:
+            return
+        factor = 1.0 / self.ZOOM_STEP
+        self.ui.graphicsView.scale(factor, factor)
+        self._zoom_factor *= factor
+        self._update_zoom_label()
+
+    def _zoom_fit(self):
+        """适应窗口显示"""
+        gv = self.ui.graphicsView
+        if self._zoom_pixmap_item is None:
+            return
+        gv.fitInView(self._zoom_pixmap_item, Qt.KeepAspectRatio)
+        # 重新计算实际缩放比例
+        tr = gv.transform()
+        self._zoom_factor = tr.m11()
+        self._update_zoom_label()
+
+    def _update_zoom_label(self):
+        pct = int(self._zoom_factor * 100)
+        self.ui.zoom_label.setText(f"{pct}%")
+
     # ====================== 切换显示全班/个人专注度 ======================
     def _update_selection(self):
         selection = self.ui.comboBox.currentText()
@@ -350,11 +441,7 @@ class DetectionApp(QMainWindow):
             self.ui.label_nums.setText(f"单人专注度：{single_focus}/10")
             self._show_detection_details(idx)
 
-        width, height = self._calculate_display_size(display_img)
-        resized_img = cv2.resize(display_img, (width, height))
-        qimage = tools.cvimg_to_qpiximg(resized_img)
-        self.ui.label_show.setPixmap(qimage)
-        self.ui.label_show.setAlignment(Qt.AlignCenter)
+        self._set_display_cvimage(display_img)
 
     # ====================== 功能函数 ======================
     def _handle_image_input(self):
@@ -393,11 +480,7 @@ class DetectionApp(QMainWindow):
         self.ui.time_lb.setText(f'{process_time:.3f} s')
         annotated_img = results.plot()
         self.current_result = annotated_img
-        width, height = self._calculate_display_size(annotated_img)
-        resized_img = cv2.resize(annotated_img, (width, height))
-        qimage = tools.cvimg_to_qpiximg(resized_img)
-        self.ui.label_show.setPixmap(qimage)
-        self.ui.label_show.setAlignment(Qt.AlignCenter)
+        self._set_display_cvimage(annotated_img)
         self.ui.PiclineEdit.setText(self.source_path)
 
     def _calculate_display_size(self, image):
@@ -609,7 +692,7 @@ class DetectionApp(QMainWindow):
             self.ui.comboBox.setEnabled(False)
         else:
             self.ui.CaplineEdit.setText('摄像头未开启')
-            self.ui.label_show.clear()
+            self.ui.label_show.scene().clear()
             self._stop_video_capture()
 
     def _save_results(self):

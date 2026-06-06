@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"from ultralytics.nn.modules.attention import SimAM, ECA, CoordAtt, C3CBAM, C3ECA, EMA; print\\('attention imports OK'\\)\")",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(python test.py)",
+      "Bash(python *)"
     ]
   }
 }
