@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="162" viewBox="0 0 1400 162">
+<rect width="100%" height="100%" fill="#f8fbff"/>
+<text x="700" y="58" text-anchor="middle" font-family="Microsoft YaHei, SimHei" font-size="34" font-weight="700" fill="#1d3557">系统软件模块结构图</text>
+<text x="70" y="118" font-family="Microsoft YaHei, SimHei" font-size="25" fill="#23364d">main.py作为调度核心，连接配置模块、工具模块、YOLO推理模块、UI模块和训练评估模块。</text>
+</svg>

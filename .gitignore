@@ -1,0 +1,7 @@
+.pt
+.img
+.jpg
+/YOLOv8学生课堂行为检测系统/__pycache__
+*.jpg
+*.png
+*.pt
