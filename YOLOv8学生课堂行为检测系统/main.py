@@ -11,8 +11,8 @@ _original_torch_load = torch.load
 
 
 def patched_torch_load(*args, **kwargs):
-    kwargs['weights_only'] = False
-    return _original_torch_load(*args, **kwargs)
+    kwargs.pop('weights_only', None)
+    return _original_torch_load(*args, **kwargs, weights_only=False)
 
 
 torch.load = patched_torch_load
@@ -25,41 +25,146 @@ import cv2
 import numpy as np
 from PIL import ImageFont
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QCoreApplication
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QFileDialog,
-                             QMessageBox, QHeaderView, QTableWidgetItem, QAbstractItemView)
+from PyQt5.QtGui import QPainter, QBrush, QColor
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QFileDialog, QFrame,
+                             QMessageBox, QHeaderView, QTableWidgetItem,
+                             QAbstractItemView, QGraphicsView, QGraphicsScene)
 from ultralytics import YOLO
 
 # 自定义模块
-sys.path.append('UIProgram')
-from UIProgram.UiMain import Ui_MainWindow
-from UIProgram.QssLoader import QSSLoader
-from UIProgram.precess_bar import ProgressBar
+from ultralytics.UIProgram.UiMain import Ui_MainWindow
+from ultralytics.UIProgram.QssLoader import QSSLoader
+from ultralytics.UIProgram.precess_bar import ProgressBar
 import detect_tools as tools
 import Config
 from roi_inference import ROIPredictor
 
+
+# ====================== 可缩放图像视图 ======================
+class ZoomableGraphicsView(QGraphicsView):
+    """支持滚轮缩放 + 拖拽平移的图像视图"""
+    ZOOM_MIN = 0.1
+    ZOOM_MAX = 10.0
+    ZOOM_STEP = 1.25
+
+    zoom_changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._zoom_factor = 1.0
+        self._pixmap_item = None
+        self.setRenderHint(QPainter.SmoothPixmapTransform)
+        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setViewportUpdateMode(QGraphicsView.SmartViewportUpdate)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setBackgroundBrush(QBrush(QColor("#f0f0f0")))
+        self._scene = QGraphicsScene(self)
+        self.setScene(self._scene)
+
+    def wheelEvent(self, event):
+        """滚轮缩放（以鼠标位置为中心）"""
+        factor = self.ZOOM_STEP
+        if event.angleDelta().y() < 0:
+            factor = 1.0 / factor
+        new_zoom = self._zoom_factor * factor
+        if self.ZOOM_MIN <= new_zoom <= self.ZOOM_MAX:
+            self.scale(factor, factor)
+            self._zoom_factor = new_zoom
+            self.zoom_changed.emit()
+
+    def set_image(self, cv_img):
+        """设置 OpenCV 图像（numpy BGR 数组），自适应显示"""
+        from PyQt5.QtCore import QRectF
+        qpix = tools.cvimg_to_qpiximg(cv_img)
+        self._scene.clear()
+        self._pixmap_item = self._scene.addPixmap(qpix)
+        self._scene.setSceneRect(QRectF(qpix.rect()))
+        self.fit_in_view()
+
+    def zoom_in(self):
+        if self._zoom_factor < self.ZOOM_MAX:
+            self.scale(self.ZOOM_STEP, self.ZOOM_STEP)
+            self._zoom_factor *= self.ZOOM_STEP
+            self.zoom_changed.emit()
+
+    def zoom_out(self):
+        if self._zoom_factor > self.ZOOM_MIN:
+            factor = 1.0 / self.ZOOM_STEP
+            self.scale(factor, factor)
+            self._zoom_factor *= factor
+            self.zoom_changed.emit()
+
+    def fit_in_view(self):
+        if self._pixmap_item is not None:
+            self.fitInView(self._pixmap_item, Qt.KeepAspectRatio)
+            self._zoom_factor = self.transform().m11()
+            self.zoom_changed.emit()
+
+    @property
+    def zoom_percent(self):
+        return int(self._zoom_factor * 100)
+
 # ====================== 【极简美化】不影响任何功能 ======================
 LIGHT_STYLE = """
-QPushButton {
-    background-color: #4a6cf7;
-    color: white;
-    border-radius: 5px;
-    padding: 4px 8px;
-}
-QPushButton:hover {
-    background-color: #3b5bdb;
-}
-QTableWidget {
-    background-color: #ffffff;
-}
-QHeaderView::section {
-    background-color: #edf1f7;
-}
 QMainWindow {
-    background-color: #f5f7fa;
+    background-color: #f0f2f5;
 }
 
-/* ------------- 缩放工具栏按钮 ------------- */
+/* ---- 功能按钮（米色系） ---- */
+QPushButton {
+    background-color: #f5efe0;
+    color: #5c4a2e;
+    border: 1px solid #d9ccb0;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #ede0c8;
+    border-color: #c4a97a;
+}
+QPushButton:pressed {
+    background-color: #e2d2b5;
+}
+
+/* ---- 保存 / 退出 按钮 ---- */
+QPushButton#SaveBtn, QPushButton#ExitBtn {
+    padding: 8px 14px;
+    font-size: 14px;
+    min-width: 80px;
+    min-height: 30px;
+}
+QPushButton#SaveBtn {
+    background-color: #d4e6d4;
+    color: #3a5c3a;
+    border-color: #b0ccb0;
+}
+QPushButton#SaveBtn:hover {
+    background-color: #c0dcc0;
+}
+QPushButton#ExitBtn {
+    background-color: #f0d5d5;
+    color: #8b3a3a;
+    border-color: #d4b0b0;
+}
+QPushButton#ExitBtn:hover {
+    background-color: #e8c5c5;
+}
+
+/* ---- 文件操作按钮加大 ---- */
+QPushButton#PicBtn, QPushButton#VideoBtn, QPushButton#CapBtn, QPushButton#FilesBtn {
+    padding: 10px 16px;
+    font-size: 15px;
+    min-width: 100px;
+    min-height: 36px;
+}
+
+/* ---- 缩放工具栏按钮 ---- */
 QPushButton#zoom_plus_btn, QPushButton#zoom_minus_btn, QPushButton#zoom_fit_btn {
     background-color: #ffffff;
     color: #333333;
@@ -68,6 +173,8 @@ QPushButton#zoom_plus_btn, QPushButton#zoom_minus_btn, QPushButton#zoom_fit_btn 
     font-size: 16px;
     font-weight: bold;
     padding: 0px;
+    min-width: 28px;
+    min-height: 28px;
 }
 QPushButton#zoom_plus_btn:hover, QPushButton#zoom_minus_btn:hover, QPushButton#zoom_fit_btn:hover {
     background-color: #e8ecf1;
@@ -78,19 +185,62 @@ QLabel#zoom_label {
     color: #555555;
 }
 
-/* ------------- 图像容器 ------------- */
+/* ---- 图像容器 ---- */
 QWidget#image_container {
     background-color: #ffffff;
-    border: 1px solid #e0e0e0;
+    border: 1px solid #d0d5dd;
     border-radius: 6px;
 }
 
-/* ------------- 只放大专注度显示标签 ------------- */
+/* ---- 控制面板 ---- */
+QWidget#control_panel {
+    background-color: transparent;
+}
+QGroupBox {
+    font-weight: bold;
+    color: #333333;
+    border: 1px solid #d0d5dd;
+    border-radius: 5px;
+    margin-top: 8px;
+    padding-top: 14px;
+    background-color: #ffffff;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px;
+}
+
+/* ---- 只读路径框 ---- */
+QLineEdit[readOnly="true"] {
+    background-color: #f5f5f5;
+    color: #666666;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    padding: 1px 4px;
+}
+
+/* ---- 表格 ---- */
+QTableWidget {
+    background-color: #ffffff;
+    border: 1px solid #d0d5dd;
+    border-radius: 4px;
+    gridline-color: #e8ecf1;
+}
+QHeaderView::section {
+    background-color: #edf1f7;
+    color: #333333;
+    font-weight: bold;
+    border: none;
+    border-bottom: 2px solid #d0d5dd;
+    padding: 6px;
+}
+
+/* ---- 专注度标签 ---- */
 QLabel#label_nums {
-    font-size: 16px;
-
-
-
+    font-size: 15px;
+    font-weight: bold;
+    color: #4a6cf7;
 }
 """
 
@@ -311,23 +461,39 @@ class DetectionApp(QMainWindow):
         self.camera_active = False
         self.video_capture = None
 
-        # ---- 初始化图像视图缩放状态 ----
-        self._zoom_factor = 1.0
-        self._zoom_pixmap_item = None
-        gv = self.ui.graphicsView
-        gv.wheelEvent = self._zoom_wheel_event  # 劫持滚轮事件
+        # ---- 替换为可缩放图像视图 ----
+        old_gv = self.ui.graphicsView
+        self._zoom_view = ZoomableGraphicsView(old_gv.parent())
+        self._zoom_view.setObjectName("graphicsView")
+        self._zoom_view.zoom_changed.connect(self._update_zoom_label)
+        # 在布局中替换
+        layout = old_gv.parent().layout()
+        if layout:
+            layout.replaceWidget(old_gv, self._zoom_view)
+        old_gv.hide()
+        old_gv.deleteLater()
+        # 更新别名和引用
+        self.ui.graphicsView = self._zoom_view
+        self.ui.label_show = self._zoom_view
 
         table = self.ui.tableWidget
         table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        table.verticalHeader().setDefaultSectionSize(40)
-        table.setColumnWidth(0, 80)
-        table.setColumnWidth(1, 200)
-        table.setColumnWidth(2, 150)
-        table.setColumnWidth(3, 90)
-        table.setColumnWidth(4, 230)
+        table.verticalHeader().setDefaultSectionSize(36)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         table.verticalHeader().setVisible(False)
         table.setAlternatingRowColors(True)
+        table.setShowGrid(True)
+        # 让列宽自适应拉伸填满表格宽度
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        # 在拉伸基础上微调各列比例
+        header.setSectionResizeMode(0, QHeaderView.Fixed)   # ID 固定宽度
+        header.setSectionResizeMode(2, QHeaderView.Fixed)   # 类别 固定宽度
+        header.setSectionResizeMode(3, QHeaderView.Fixed)   # 置信度 固定宽度
+        table.setColumnWidth(0, 60)    # ID
+        table.setColumnWidth(2, 130)   # 类别
+        table.setColumnWidth(3, 90)    # 置信度
+        # 路径(1) 和 位置(4) 自动拉伸填满剩余空间
 
     def _connect_signals(self):
         self.ui.PicBtn.clicked.connect(self._handle_image_input)
@@ -369,59 +535,21 @@ class DetectionApp(QMainWindow):
         self.focus_tracker = FocusTracker()
 
     # ====================== 图像缩放功能 ======================
-    ZOOM_MIN = 0.1
-    ZOOM_MAX = 10.0
-    ZOOM_STEP = 1.25
-
     def _set_display_cvimage(self, cv_img):
-        """将 OpenCV 图像设置到 QGraphicsView 中，初始自动适应窗口"""
-        qpix = tools.cvimg_to_qpiximg(cv_img)
-        scene = self.ui.graphicsView.scene()
-        scene.clear()
-        self._zoom_pixmap_item = scene.addPixmap(qpix)
-        scene.setSceneRect(qpix.rect())
-        self._zoom_fit()
-
-    def _zoom_wheel_event(self, event):
-        """鼠标滚轮缩放（以鼠标位置为中心）"""
-        factor = self.ZOOM_STEP
-        if event.angleDelta().y() < 0:
-            factor = 1.0 / factor
-        new_zoom = self._zoom_factor * factor
-        if self.ZOOM_MIN <= new_zoom <= self.ZOOM_MAX:
-            self.ui.graphicsView.scale(factor, factor)
-            self._zoom_factor = new_zoom
-            self._update_zoom_label()
+        """将 OpenCV 图像设置到可缩放视图中"""
+        self._zoom_view.set_image(cv_img)
 
     def _zoom_in(self):
-        if self._zoom_factor >= self.ZOOM_MAX:
-            return
-        self.ui.graphicsView.scale(self.ZOOM_STEP, self.ZOOM_STEP)
-        self._zoom_factor *= self.ZOOM_STEP
-        self._update_zoom_label()
+        self._zoom_view.zoom_in()
 
     def _zoom_out(self):
-        if self._zoom_factor <= self.ZOOM_MIN:
-            return
-        factor = 1.0 / self.ZOOM_STEP
-        self.ui.graphicsView.scale(factor, factor)
-        self._zoom_factor *= factor
-        self._update_zoom_label()
+        self._zoom_view.zoom_out()
 
     def _zoom_fit(self):
-        """适应窗口显示"""
-        gv = self.ui.graphicsView
-        if self._zoom_pixmap_item is None:
-            return
-        gv.fitInView(self._zoom_pixmap_item, Qt.KeepAspectRatio)
-        # 重新计算实际缩放比例
-        tr = gv.transform()
-        self._zoom_factor = tr.m11()
-        self._update_zoom_label()
+        self._zoom_view.fit_in_view()
 
     def _update_zoom_label(self):
-        pct = int(self._zoom_factor * 100)
-        self.ui.zoom_label.setText(f"{pct}%")
+        self.ui.zoom_label.setText(f"{self._zoom_view.zoom_percent}%")
 
     # ====================== 切换显示全班/个人专注度 ======================
     def _update_selection(self):

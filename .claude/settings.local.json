@@ -4,7 +4,32 @@
       "Bash(python -c \"from ultralytics.nn.modules.attention import SimAM, ECA, CoordAtt, C3CBAM, C3ECA, EMA; print\\('attention imports OK'\\)\")",
       "Bash(python -c ' *)",
       "Bash(python test.py)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(git checkout *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(git clone *)",
+      "Bash(git config *)",
+      "Bash(env)",
+      "Bash(git ls-remote *)",
+      "Bash(gh --version)",
+      "Bash(gh repo *)",
+      "Bash(curl -s --connect-timeout 10 -L \"https://ghproxy.com/https://raw.githubusercontent.com/Whiffe/SCB-dataset/main/README.md\")",
+      "Bash(curl -s --connect-timeout 15 -L \"https://raw.githubusercontent.com/Whiffe/SCB-dataset/main/README.md\")",
+      "Bash(curl -s --connect-timeout 15 -L \"https://hub.fastgit.xyz/Whiffe/SCB-dataset/raw/main/README.md\")",
+      "Bash(curl -s --connect-timeout 15 -L \"https://cdn.jsdelivr.net/gh/Whiffe/SCB-dataset@main/README.md\")",
+      "Bash(curl -s --connect-timeout 15 -L \"https://huggingface.co/api/datasets?search=SCB+classroom+behavior\")",
+      "WebFetch(domain:www.nature.com)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:pubmed.ncbi.nlm.nih.gov)",
+      "WebFetch(domain:www.ncbi.nlm.nih.gov)",
+      "WebFetch(domain:paperity.org)",
+      "WebFetch(domain:ar5iv.labs.arxiv.org)",
+      "Bash(git *)",
+      "Bash(pip list *)",
+      "Read(//mnt/c/Users/19554/Documents/GitHub/yolov8_cba/**)",
+      "Bash(ls -d datasets/*/)",
+      "Bash(find runs/detect -name \"best.pt\")"
     ]
   }
 }
