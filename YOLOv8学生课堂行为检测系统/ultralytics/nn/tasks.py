@@ -65,6 +65,8 @@ from ultralytics.nn.modules.attention import (  # 自定义注意力机制
     C3CBAM,
     C3ECA,
     EMA,
+    BottleneckWithCoordAtt,
+    C2fCoordAtt,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -737,7 +739,7 @@ def torch_safe_load(weight):
                 "ultralytics.yolo.data": "ultralytics.data",
             }
         ):  # for legacy 8.0 Classify and Pose models
-            ckpt = torch.load(file, map_location="cpu")
+            ckpt = torch.load(file, map_location="cpu", weights_only=False)
 
     except ModuleNotFoundError as e:  # e.name is missing module name
         if e.name == "models":
@@ -757,7 +759,7 @@ def torch_safe_load(weight):
             f"run a command with an official YOLOv8 model, i.e. 'yolo predict model=yolov8n.pt'"
         )
         check_requirements(e.name)  # install missing module
-        ckpt = torch.load(file, map_location="cpu")
+        ckpt = torch.load(file, map_location="cpu", weights_only=False)
 
     if not isinstance(ckpt, dict):
         # File is likely a YOLO instance saved with i.e. torch.save(model, "saved_model.pt")
@@ -906,6 +908,8 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             C3CBAM,
             C3ECA,
             EMA,
+            BottleneckWithCoordAtt,
+            C2fCoordAtt,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
@@ -939,6 +943,9 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                 c2 = ch[f]  # 不改变通道数
             elif m in {C3CBAM, C3ECA}:
                 # C3CBAM/C3ECA(c1, c2, n, shortcut, g, e)
+                args = [c1, c2, *args[1:]]
+            elif m in {C2fCoordAtt}:
+                # C2fCoordAtt(c1, c2, n, shortcut, g, e) — 同 C2f 参数
                 args = [c1, c2, *args[1:]]
             else:
                 args = [c1, c2, *args[1:]]

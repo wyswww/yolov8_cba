@@ -86,6 +86,8 @@ from .attention import (  # 新增注意力机制模块
     C3CBAM,
     C3ECA,
     EMA,
+    BottleneckWithCoordAtt,
+    C2fCoordAtt,
 )
 
 __all__ = (
@@ -159,4 +161,6 @@ __all__ = (
     "C3CBAM",
     "C3ECA",
     "EMA",
+    "BottleneckWithCoordAtt",
+    "C2fCoordAtt",
 )

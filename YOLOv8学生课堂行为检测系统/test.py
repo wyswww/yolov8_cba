@@ -10,7 +10,10 @@ warnings.filterwarnings("ignore")
 
 # PyTorch 2.6 compatibility for loading Ultralytics checkpoints.
 _original_load = torch.load
-torch.load = lambda *args, **kwargs: _original_load(*args, **kwargs, weights_only=False)
+def _patched_load(*args, **kwargs):
+    kwargs.setdefault('weights_only', False)
+    return _original_load(*args, **kwargs)
+torch.load = _patched_load
 
 from ultralytics import YOLO
 
@@ -22,7 +25,7 @@ MODELS = [
     {"name": "4_baseline_finetune_img800_weakaug", "path": "runs/detect/baseline_finetune_img800_weakaug/weights/best.pt",    "imgsz": 800},
     {"name": "5_coordatt_backbone_eca_neck",       "path": "runs/detect/coordatt_backbone_eca_neck_m_pretrained/weights/best.pt", "imgsz": 640},
     {"name": "6_strong_img800_tail_weakaug",       "path": "runs/detect/strong_img800_tail_weakaug/weights/best.pt",          "imgsz": 800},
-    {"name": "7_exp", "path": "runs/detect/exp/weights/best.pt",  "imgsz": 640},
+
 ]
 
 BASE_TEST_CONFIG = {

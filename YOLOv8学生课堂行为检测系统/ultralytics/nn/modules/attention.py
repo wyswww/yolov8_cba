@@ -9,8 +9,9 @@
 import torch
 import torch.nn as nn
 import math
+from .conv import Conv
 
-__all__ = ['SimAM', 'ECA', 'CoordAtt', 'C3CBAM', 'C3ECA', 'EMA']
+__all__ = ['SimAM', 'ECA', 'CoordAtt', 'C3CBAM', 'C3ECA', 'EMA', 'BottleneckWithCoordAtt', 'C2fCoordAtt']
 
 
 class SimAM(nn.Module):
@@ -31,7 +32,6 @@ class SimAM(nn.Module):
         var = x.var(dim=[2, 3], keepdim=True) + self.e_lambda
 
         # 计算注意力权重
-        t = (x - mean) / torch.sqrt(var)
         t = (x - mean) / torch.sqrt(var)
         attention = self.activation(t.pow(2)).pow(0.5)
 
@@ -57,7 +57,7 @@ class ECA(nn.Module):
         y = self.avg_pool(x)
         y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
         y = self.sigmoid(y)
-        return x * y.expand_as(x)
+        return x * y
 
 
 class CoordAtt(nn.Module):
@@ -67,7 +67,7 @@ class CoordAtt(nn.Module):
 
     特点: 将通道注意力分解为两个1D特征编码过程，分别沿水平和垂直方向聚合特征
     """
-    def __init__(self, inp, oup, reduction=32):
+    def __init__(self, inp, oup, reduction=16):
         super(CoordAtt, self).__init__()
         mip = max(8, inp // reduction)
 
@@ -99,7 +99,6 @@ class CoordAtt(nn.Module):
 
         # 步骤5: 分别卷积 + sigmoid 生成注意力权重
         a_h = self.conv_h(x_h).sigmoid()       # (b, oup, h, 1)
-        a_h = self.conv_h(x_h).sigmoid()
         a_w = self.conv_w(x_w).sigmoid()
 
         # 步骤6: 广播乘积应用到输入特征图
@@ -200,14 +199,50 @@ class EMA(nn.Module):
 
         # 通道级平均和最大池化
         x_avg = x2.mean(dim=2, keepdim=True)
-        x_avg = x2.mean(dim=2, keepdim=True)
         x_max = x2.max(dim=2, keepdim=True)[0]
 
         # 连接并卷积
-        x_concat = torch.cat([x_avg, x_max], dim=2)
         x_concat = torch.cat([x_avg, x_max], dim=2)
         x_concat = x_concat.reshape(b, g, 2, self.group_channels, h, w)
         x_concat = x_concat.permute(0, 1, 3, 4, 5, 2).reshape(b, c, h, w)
 
         attention = self.act(self.norm(self.conv(x_concat)))
         return x * attention
+
+
+# ============================================================
+# 带CoordAtt的Bottleneck和C2f模块
+# ============================================================
+
+
+class BottleneckWithCoordAtt(nn.Module):
+    """带CoordAtt注意力的Bottleneck — 在cv2之后应用坐标注意力"""
+    def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
+        super().__init__()
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, c_, k[0], 1)
+        self.cv2 = Conv(c_, c2, k[1], 1, g=g)
+        self.add = shortcut and c1 == c2
+        self.coordatt = CoordAtt(c2, c2)
+
+    def forward(self, x):
+        out = self.cv2(self.cv1(x))
+        out = self.coordatt(out)
+        return x + out if self.add else out
+
+
+class C2fCoordAtt(nn.Module):
+    """C2f模块，内部Bottleneck嵌入CoordAtt注意力 — 注意力在每个Bottleneck内生效"""
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
+        super().__init__()
+        self.c = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, 2 * self.c, 1, 1)
+        self.cv2 = Conv((2 + n) * self.c, c2, 1)
+        self.m = nn.ModuleList(
+            BottleneckWithCoordAtt(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0)
+            for _ in range(n))
+
+    def forward(self, x):
+        y = list(self.cv1(x).chunk(2, 1))
+        y.extend(m(y[-1]) for m in self.m)
+        return self.cv2(torch.cat(y, 1))

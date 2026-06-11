@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     results = model.train(
         data=DATA_YAML,
-        epochs=100,
+        epochs=50,        # 50 epoch 已基本收敛（参考之前训练曲线，60→100只涨了2%）
         patience=30,
         batch=8,
         imgsz=640,
@@ -104,12 +104,13 @@ if __name__ == "__main__":
         mosaic=0.8,
         mixup=0.1,
         copy_paste=0.05,
-        close_mosaic=10,
+        close_mosaic=5,     # 更早关闭 mosaic 加速训练
         amp=True,
         cache=True,
         box=7.5,
         cls=0.5,
         dfl=1.5,
+        freeze=10,          # 冻结 backbone 前10层，新注意力层更快收敛
         pretrained=False,
         verbose=True,
         seed=42,
