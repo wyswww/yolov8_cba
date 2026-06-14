@@ -18,8 +18,9 @@ torch.load = _patched_load
 from ultralytics import YOLO
 
 # ========== 修改下面三行即可切换模型 ==========
-MODEL_NAME = "yolov8m_p2_coco_pretrained"
-MODEL_PATH = "runs/detect/yolov8m_p2_coco_pretrained/weights/best.pt"
+MODEL_NAME = "coordatt_backbone_eca_neck_m_pretrained"
+# best.pt = 验证集最优  last.pt = 最新（训练中测这个才能看到变化）
+MODEL_PATH = "runs/detect/coordatt_backbone_eca_neck_v2/weights/best.pt"
 IMGSZ = 640
 # ==============================================
 
