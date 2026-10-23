@@ -30,7 +30,8 @@
       "Read(//mnt/c/Users/19554/Documents/GitHub/yolov8_cba/**)",
       "Bash(ls -d datasets/*/)",
       "Bash(find runs/detect -name \"best.pt\")",
-      "Bash(sort -t',' -k8 -rn)"
+      "Bash(sort -t',' -k8 -rn)",
+      "Bash(python3)"
     ]
   }
 }
